@@ -4,10 +4,13 @@
 
 // @import_models
 import { Lead, Campaign, Third, Adnetwork, Tracking, Message, Interaction } from "@app/models"
+import { LeadStage, Program, User } from "@app/models"
+import mongoose from 'mongoose'
 
 // @import_utilities
 import { responseUtility } from "@core/utilities/responseUtility"
 import moment from "moment";
+import { validateLeadInput } from '@app/domains/lead/leadValidation'
 
 // @import_types
 
@@ -16,9 +19,77 @@ class LeadService {
   
   
   constructor () {}
+
+  public async create (_params) {
+    try {
+      const validation = validateLeadInput(_params)
+
+      if (!validation.value) {
+        return responseUtility.error('lead.invalid_data', null, {
+          code: 400,
+          errors: validation.errors,
+        })
+      }
+
+      const leadData = validation.value
+      const references = [leadData.responsible, leadData.interestProgram, leadData.stage]
+
+      if (references.some(reference => !mongoose.isValidObjectId(reference))) {
+        return responseUtility.error('lead.invalid_reference', null, { code: 400 })
+      }
+
+      const [responsible, program, stage] = await Promise.all([
+        User.findOne({ _id: leadData.responsible, status: 'active' }).select('_id').lean(),
+        Program.findOne({ _id: leadData.interestProgram }).select('_id').lean(),
+        LeadStage.findOne({ _id: leadData.stage, status: 'active' }).select('_id').lean(),
+      ])
+
+      if (!responsible) return responseUtility.error('lead.responsible_not_found', null, { code: 404 })
+      if (!program) return responseUtility.error('lead.program_not_found', null, { code: 404 })
+      if (!stage) return responseUtility.error('lead.stage_not_found', null, { code: 404 })
+
+      const lead = await Lead.create({
+        ...leadData,
+        full_name: `${leadData.first_name} ${leadData.last_name}`.trim(),
+      })
+
+      return responseUtility.success({ object: lead.toObject() })
+    } catch (error) {
+      console.log('Lead create error', error)
+      return responseUtility.error('lead.create_error', null, { code: 500 })
+    }
+  }
+
+  public async move (_params) {
+    try {
+      if (!mongoose.isValidObjectId(_params._id) || !mongoose.isValidObjectId(_params.stage)) {
+        return responseUtility.error('lead.invalid_reference', null, { code: 400 })
+      }
+
+      const [lead, stage] = await Promise.all([
+        Lead.findOne({ _id: _params._id, status: 'active' }),
+        LeadStage.findOne({ _id: _params.stage, status: 'active' }).select('_id').lean(),
+      ])
+
+      if (!lead) return responseUtility.error('lead.not_found', null, { code: 404 })
+      if (!stage) return responseUtility.error('lead.stage_not_found', null, { code: 404 })
+
+      lead.stage = stage._id
+      await lead.save()
+
+      return responseUtility.success({ object: lead.toObject() })
+    } catch (error) {
+      console.log('Lead move error', error)
+      return responseUtility.error('lead.move_error', null, { code: 500 })
+    }
+  }
   
   public async upsert (_params) {
     try{ 
+      if (_params.first_name || _params.last_name || _params.document_type || _params.interestProgram || _params.stage) {
+        return await this.create(_params)
+      }
+
       if(_params.user){
         const third = await Third.findOne({user: _params.user}).lean()
         if(!third) return responseUtility.error('third.not_found1');
@@ -252,6 +323,12 @@ class LeadService {
   public async list (_params) {
     try{
       const where:any = {}
+
+      where.status = _params.status === 'inactive' ? 'inactive' : 'active'
+
+      if (_params.stage && mongoose.isValidObjectId(_params.stage)) {
+        where.stage = _params.stage
+      }
       
       let third
       
@@ -267,6 +344,21 @@ class LeadService {
         path: 'contact',
         select: 'first_name last_name document number',
         options: { lean:true }
+      })
+      .populate({
+        path: 'responsible',
+        select: '_id username profile',
+        options: { lean:true },
+      })
+      .populate({
+        path: 'interestProgram',
+        select: '_id name description',
+        options: { lean:true },
+      })
+      .populate({
+        path: 'stage',
+        select: '_id name key color order status',
+        options: { lean:true },
       })
       .limit(100)
       .lean()

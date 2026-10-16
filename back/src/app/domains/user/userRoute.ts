@@ -28,6 +28,7 @@ class UserRoute {
   
   private routes: Array<IRouteParams> = [
     // @routes
+    { method: 'get', path: '/assignees', handler: this.controller.assignees , middleware: [auth] },
     { method: 'get', path: '/', handler: this.controller.list , middleware: [auth] },
     { method: 'get', path: '/get/:_id', handler: this.controller.get , middleware: [auth] },
     { method: 'post', path: '/upsert', handler: this.controller.upsert , middleware: [auth] },

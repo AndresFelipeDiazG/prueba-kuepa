@@ -5,7 +5,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "dev": "nodemon -r tsconfig-paths/register --watch src src/app/server.ts",
-    "cli": "ts-node -r tsconfig-paths/register src/client/client.ts"
+    "cli": "ts-node -r tsconfig-paths/register src/client/client.ts",
+    "test": "tsx --test src/app/domains/lead/leadStageRules.test.ts src/app/domains/lead/leadValidation.test.ts src/app/middleware/permissionRules.test.ts"
   },
   "keywords": [
     "crm",

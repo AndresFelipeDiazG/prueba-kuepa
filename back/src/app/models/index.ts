@@ -3,6 +3,8 @@
 import { RoleModel } from '@app/models/roleModel'
 import { PermissionModel } from '@app/models/permissionModel'
 import { LeadModel } from '@app/models/leadModel'
+import { LeadStageModel } from '@app/models/leadStageModel'
+import { ProgramModel } from '@app/models/programModel'
 import { ThirdModel } from '@app/models/thirdModel'
 import { UserModel } from '@app/models/userModel'
 import { CampaignModel } from '@app/models/campaignModel'
@@ -17,6 +19,8 @@ export {
   RoleModel as Role,
   PermissionModel as Permission,
   LeadModel as Lead,
+  LeadStageModel as LeadStage,
+  ProgramModel as Program,
   ThirdModel as Third,
   UserModel as User,
   CampaignModel as Campaign,

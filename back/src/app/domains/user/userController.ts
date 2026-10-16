@@ -55,6 +55,11 @@ class UserController {
     const response = await this.service.list(_params)
     return responseUtility.build(res, response)
   } 
+
+  public assignees = async(req: Request, res: Response) => {
+    const response = await this.service.assignees()
+    return responseUtility.build(res, response)
+  }
   
 }
 

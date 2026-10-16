@@ -68,6 +68,20 @@ class UserService {
       console.log('error', error)
     }
   }
+
+  public async assignees () {
+    try {
+      const list = await User.find({status: 'active'})
+      .select('_id username profile status')
+      .sort({'profile.first_name': 1})
+      .lean()
+
+      return responseUtility.success({ list })
+    } catch (error) {
+      console.log('error', error)
+      return responseUtility.error('user.assignees_error', null, { code: 500 })
+    }
+  }
   
   public async upsert (_params) {
     try{

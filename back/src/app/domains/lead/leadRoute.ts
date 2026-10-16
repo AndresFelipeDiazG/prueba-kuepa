@@ -30,6 +30,8 @@ class LeadRoute {
     // @routes
     { method: 'get', path: '/get/:_id', handler: this.controller.get , middleware: [auth] },
     { method: 'get', path: '/', handler: this.controller.list , middleware: [auth] },
+    { method: 'post', path: '/create', handler: this.controller.create , middleware: [auth] },
+    { method: 'post', path: '/move', handler: this.controller.move , middleware: [auth] },
     { method: 'post', path: '/test', handler: this.controller.test , middleware: [] },
     { method: 'post', path: '/upsert', handler: this.controller.upsert , middleware: [auth] },
     { method: 'post', path: '/external', handler: this.controller.external , middleware: [] },
