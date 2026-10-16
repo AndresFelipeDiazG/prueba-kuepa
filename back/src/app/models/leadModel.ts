@@ -14,6 +14,7 @@ export interface ILead {
   mobile_phone?: string;
   document_type?: DocumentType;
   document?: string;
+  contact?: mongoose.Types.ObjectId;
   responsible?: mongoose.Types.ObjectId;
   origin?: LeadOrigin;
   tags?: string[];
@@ -31,12 +32,21 @@ const LeadSchema = new Schema({
   first_name: {type: Schema.Types.String},
   last_name: {type: Schema.Types.String},
   email: {type: Schema.Types.String},
-  mobile_phone: {type: Schema.Types.String},
+  mobile_phone: {
+    type: Schema.Types.String,
+    trim: true,
+    match: /^\d{10}$/,
+  },
   document_type: {
     type: Schema.Types.String,
     enum: DOCUMENT_TYPES,
   },
-  document: {type: Schema.Types.String},
+  document: {
+    type: Schema.Types.String,
+    trim: true,
+    match: /^\d{4,20}$/,
+  },
+  contact: {type: Schema.Types.ObjectId, ref: 'Third'},
   responsible: {type: Schema.Types.ObjectId, ref: 'User'},
   origin: {
     type: Schema.Types.String,
@@ -65,6 +75,25 @@ LeadSchema.plugin(mongoose_delete, {
   overrideMethods: 'all',
   indexFields: 'all' 
 }) 
+
+LeadSchema.index(
+  { mobile_phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { mobile_phone: { $type: 'string' } },
+  },
+)
+
+LeadSchema.index(
+  { document_type: 1, document: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      document_type: { $type: 'string' },
+      document: { $type: 'string' },
+    },
+  },
+)
 
 
 export const LeadModel = mongoose.model<ILead, any>('Lead', LeadSchema)

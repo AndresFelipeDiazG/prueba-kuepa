@@ -1,7 +1,8 @@
-import { app, access } from '@/atoms/kuepa'
+import { app, access, user } from '@/atoms/kuepa'
 import { leadService } from '@/services/leadService'
+import { useToast } from '@/components/hooks/use-toast'
 import { useStore } from '@nanostores/react'
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react'
+import { FormEvent, ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Archive,
@@ -54,8 +55,9 @@ type Assignee = {
 
 type Lead = {
   _id: string
-  first_name: string
-  last_name: string
+  first_name?: string
+  last_name?: string
+  full_name?: string
   email?: string
   mobile_phone?: string
   document_type?: string
@@ -66,6 +68,10 @@ type Lead = {
   stage?: Stage | string | null
   responsible?: Assignee | string | null
   interestProgram?: Program | string | null
+  contact?: {
+    first_name?: string
+    last_name?: string
+  } | null
 }
 
 type LeadForm = {
@@ -128,7 +134,14 @@ const nameOf = (value: unknown): string => {
 }
 
 const initialsOf = (lead: Lead): string => {
-  return `${lead.first_name?.[0] || ''}${lead.last_name?.[0] || ''}`.toUpperCase()
+  const name = leadNameOf(lead)
+  return name.split(' ').map(part => part[0] || '').join('').slice(0, 2).toUpperCase()
+}
+
+const leadNameOf = (lead: Lead): string => {
+  const ownName = `${lead.first_name || ''} ${lead.last_name || ''}`.trim()
+  const contactName = `${lead.contact?.first_name || ''} ${lead.contact?.last_name || ''}`.trim()
+  return ownName || contactName || lead.full_name || 'Lead sin nombre'
 }
 
 const originLabel = (origin?: string): string => {
@@ -152,18 +165,55 @@ const errorMessage = (response: any): string => {
   return response?.message || 'No fue posible completar la operación'
 }
 
+const wait = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds))
+
+type LeadFieldErrors = Partial<Record<keyof LeadForm, string>>
+
+const validateLeadForm = (value: LeadForm): LeadFieldErrors => {
+  const errors: LeadFieldErrors = {}
+  const namePattern = /^[\p{L}\s'-]+$/u
+  const phone = value.mobile_phone.trim()
+  const document = value.document.trim()
+
+  if (!value.first_name.trim()) errors.first_name = 'El nombre es obligatorio'
+  else if (value.first_name.trim().length < 2) errors.first_name = 'El nombre debe tener al menos 2 caracteres'
+  else if (!namePattern.test(value.first_name.trim())) errors.first_name = 'El nombre solo puede contener letras y espacios'
+  if (!value.last_name.trim()) errors.last_name = 'El apellido es obligatorio'
+  else if (value.last_name.trim().length < 2) errors.last_name = 'El apellido debe tener al menos 2 caracteres'
+  else if (!namePattern.test(value.last_name.trim())) errors.last_name = 'El apellido solo puede contener letras y espacios'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value.email.trim())) errors.email = 'Ingresa un correo electrónico válido'
+  if (!phone) errors.mobile_phone = 'El teléfono es obligatorio'
+  else if (!/^\d+$/.test(phone)) errors.mobile_phone = 'El teléfono solo puede contener números'
+  else if (phone.length !== 10) errors.mobile_phone = 'El teléfono debe tener exactamente 10 dígitos'
+  if (!value.document_type) errors.document_type = 'Selecciona un tipo de documento'
+  if (!document) errors.document = 'El documento es obligatorio'
+  else if (!/^\d+$/.test(document)) errors.document = 'El documento solo puede contener números'
+  else if (document.length < 4 || document.length > 20) errors.document = 'El documento debe tener entre 4 y 20 dígitos'
+  if (!value.responsible) errors.responsible = 'Selecciona un responsable'
+  if (!value.origin) errors.origin = 'Selecciona un origen'
+  if (!value.interestProgram) errors.interestProgram = 'Selecciona un programa'
+  if (!value.stage) errors.stage = 'Selecciona una etapa'
+
+  return errors
+}
+
+function FieldError ({ message }: { message?: string }) {
+  return message ? <small className="crm-field-error" role="alert">{message}</small> : null
+}
+
 type DesignSelectProps = {
   value: string
   placeholder: string
   options: Array<{ value: string, label: string }>
   onChange: (value: string) => void
   disabled?: boolean
+  invalid?: boolean
 }
 
-function DesignSelect ({ value, placeholder, options, onChange, disabled = false }: DesignSelectProps) {
+function DesignSelect ({ value, placeholder, options, onChange, disabled = false, invalid = false }: DesignSelectProps) {
   return (
     <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger className="crm-select-trigger" aria-label={placeholder}>
+      <SelectTrigger className={`crm-select-trigger ${invalid ? 'crm-select-invalid' : ''}`} aria-label={placeholder} aria-invalid={invalid}>
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent className="crm-select-content">
@@ -179,6 +229,8 @@ function ModalPortal ({ children }: { children: ReactNode }) {
 
 export default function Leads () {
   const $access = useStore(access) as any
+  const $user = useStore(user) as any
+  const { toast } = useToast()
   const [stages, setStages] = useState<Stage[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
   const [programs, setPrograms] = useState<Program[]>([])
@@ -199,24 +251,39 @@ export default function Leads () {
   const [tagInput, setTagInput] = useState('')
   const [form, setForm] = useState<LeadForm>(emptyForm)
   const [notice, setNotice] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<LeadFieldErrors>({})
+  const loadSequence = useRef(0)
 
-  const canManageStages = Boolean(
-    $access?.can?.includes?.('all') || $access?.can?.includes?.('crm:lead-stages:manage'),
-  )
+  const homePermissions = ($user?.homes || [])
+    .filter((home: any) => home.app === 'kuepa')
+    .flatMap((home: any) => [
+      ...(Array.isArray(home.can) ? home.can : []),
+      ...(Array.isArray(home.permissions) ? home.permissions : []),
+      ...(Array.isArray(home.roles) ? home.roles.flatMap((role: any) => role.permissions || []) : []),
+    ])
+    .map((permission: any) => typeof permission === 'string' ? permission : permission?.content)
+
+  const availablePermissions = [
+    ...($access?.can || []),
+    ...homePermissions,
+  ]
+
+  const canManageStages = availablePermissions.includes('all') || availablePermissions.includes('crm:lead-stages:manage')
 
   useEffect(() => {
     app.set({
       ...(app.get() || {}),
       app: 'kuepa',
-      module: 'leads',
-      window: 'crm',
+       module: 'crm',
+       window: 'lead',
       back: null,
       accent: 'purple',
       breadcrumb: [{ title: 'Leads', url: '/leads' }],
     })
   }, [])
 
-  const loadData = async () => {
+  const loadData = async (leadToKeep?: Lead, attempt = 0) => {
+    const currentSequence = ++loadSequence.current
     setLoading(true)
     const [stageResponse, leadResponse, programResponse, assigneeResponse] = await Promise.all([
       leadService.stages(),
@@ -225,14 +292,36 @@ export default function Leads () {
       leadService.assignees(),
     ])
 
+    if (currentSequence !== loadSequence.current) return
+
+    const responses = [stageResponse, leadResponse, programResponse, assigneeResponse]
+    const dataUnavailable = responses.some(response => response?.code !== 200)
+    if (dataUnavailable && attempt < 6) {
+      await wait(500 * (attempt + 1))
+      return loadData(leadToKeep, attempt + 1)
+    }
+
     if (stageResponse?.code === 200) setStages((stageResponse.list || []).sort((a: Stage, b: Stage) => a.order - b.order))
-    if (leadResponse?.code === 200) setLeads(leadResponse.list || [])
+    if (leadResponse?.code === 200) {
+      const nextLeads = [...(leadResponse.list || [])]
+      if (leadToKeep?._id && !nextLeads.some(lead => lead._id === leadToKeep._id)) nextLeads.unshift(leadToKeep)
+      setLeads(nextLeads)
+    }
     if (programResponse?.code === 200) setPrograms(programResponse.list || [])
     if (assigneeResponse?.code === 200) setAssignees(assigneeResponse.list || [])
-    if ([stageResponse, leadResponse, programResponse, assigneeResponse].some(response => response?.status === 'error')) {
+    if (responses.some(response => response?.status === 'error')) {
       setNotice('No fue posible cargar todos los datos del CRM')
     }
     setLoading(false)
+  }
+
+  const loadLeads = async (leadToKeep?: Lead) => {
+    const response = await leadService.list()
+    if (response?.code !== 200) return
+
+    const nextLeads = [...(response.list || [])]
+    if (leadToKeep?._id && !nextLeads.some(lead => lead._id === leadToKeep._id)) nextLeads.unshift(leadToKeep)
+    setLeads(nextLeads)
   }
 
   useEffect(() => {
@@ -240,13 +329,27 @@ export default function Leads () {
   }, [])
 
   useEffect(() => {
+    const refreshOnFocus = () => void loadLeads()
+    window.addEventListener('focus', refreshOnFocus)
+    return () => window.removeEventListener('focus', refreshOnFocus)
+  }, [])
+
+  useEffect(() => {
     if (!form.stage && stages[0]) setForm(current => ({ ...current, stage: stages[0]._id }))
   }, [stages, form.stage])
+
+  useEffect(() => {
+    const modal = document.querySelector('.crm-lead-modal') as HTMLFormElement | null
+    if (modal) modal.noValidate = true
+    if (!showNewLead) {
+      setFieldErrors({})
+    }
+  }, [showNewLead])
 
   const visibleLeads = useMemo(() => {
     const query = search.trim().toLowerCase()
     return leads.filter(lead => {
-      const content = `${lead.first_name} ${lead.last_name} ${lead.email || ''} ${lead.document || ''} ${originLabel(lead.origin)} ${(lead.tags || []).join(' ')}`.toLowerCase()
+      const content = `${leadNameOf(lead)} ${lead.email || ''} ${lead.document || ''} ${originLabel(lead.origin)} ${(lead.tags || []).join(' ')}`.toLowerCase()
       return (!query || content.includes(query)) &&
         (!selectedOrigin || lead.origin === selectedOrigin) &&
         (!selectedResponsible || idOf(lead.responsible) === selectedResponsible)
@@ -257,6 +360,11 @@ export default function Leads () {
 
   const updateForm = (field: keyof LeadForm, value: string) => {
     setForm(current => ({ ...current, [field]: value }))
+    setFieldErrors(current => {
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
   }
 
   const addTag = (value: string) => {
@@ -268,23 +376,40 @@ export default function Leads () {
 
   const submitLead = async (event: FormEvent) => {
     event.preventDefault()
+    const validationErrors = validateLeadForm(form)
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      return
+    }
+
     setSaving(true)
     setNotice('')
     const response = await leadService.create(form)
     if (response?.code === 200) {
+      const createdLead = response.object as Lead
       setForm(emptyForm)
       setTagInput('')
+      setFieldErrors({})
       setShowNewLead(false)
-      await loadData()
-      setNotice('Lead creado correctamente')
+      toast({
+        title: 'Lead creado',
+        description: 'El lead se creó correctamente.',
+        className: 'crm-success-toast',
+      })
+      if (createdLead?._id) setLeads(current => [createdLead, ...current.filter(lead => lead._id !== createdLead._id)])
+      void loadLeads(createdLead)
     } else {
-      setNotice(errorMessage(response))
+      setFieldErrors(response?.errors || {})
     }
     setSaving(false)
   }
 
   const moveLead = async (stageId: string) => {
     if (!draggedLead) return
+    if (stageId === '__unassigned__') {
+      setDraggedLead(null)
+      return
+    }
     const currentLead = leads.find(lead => lead._id === draggedLead)
     if (!currentLead || idOf(currentLead.stage) === stageId) {
       setDraggedLead(null)
@@ -354,10 +479,20 @@ export default function Leads () {
     else setNotice(errorMessage(response))
   }
 
-  const filteredStages = stages.map(stage => ({
-    ...stage,
-    leads: visibleLeads.filter(lead => idOf(lead.stage) === stage._id),
-  }))
+  const filteredStages = [
+    ...(visibleLeads.some(lead => !idOf(lead.stage)) ? [{
+      _id: '__unassigned__',
+      name: 'Sin etapa',
+      color: '#8b8192',
+      order: 0,
+      status: 'active' as const,
+      leads: visibleLeads.filter(lead => !idOf(lead.stage)),
+    }] : []),
+    ...stages.map(stage => ({
+      ...stage,
+      leads: visibleLeads.filter(lead => idOf(lead.stage) === stage._id),
+    })),
+  ]
 
   return (
     <main className="crm-page">
@@ -382,11 +517,36 @@ export default function Leads () {
 
         {activeView === 'stages' && canManageStages ? <section className="crm-stage-settings"><div className="crm-settings-heading"><div><div className="crm-eyebrow"><Settings2 size={14} /> Configuración del pipeline</div><h2>Ordena y personaliza tus etapas</h2><p>Define el recorrido comercial y el color de cada etapa.</p></div><button className="crm-secondary-button" onClick={() => setActiveView('board')}><LayoutGrid size={15} /> Volver al kanban</button></div><div className="crm-stage-list">{stages.map((stage, index) => <article className="crm-stage-row" key={stage._id} draggable onDragStart={() => setDraggedStage(stage._id)} onDragOver={event => event.preventDefault()} onDrop={() => void reorderStages(stage._id)}><GripVertical className="crm-drag-handle" size={17} /><span className="crm-stage-order">{index + 1}</span><span className="crm-stage-dot large" style={{ background: stage.color }} /><input value={stage.name} onChange={event => setStages(current => current.map(item => item._id === stage._id ? { ...item, name: event.target.value } : item))} onBlur={() => void saveStage(stage, { name: stages.find(item => item._id === stage._id)?.name || stage.name })} aria-label={`Nombre de ${stage.name}`} /><span className="crm-stage-leads">{visibleLeads.filter(lead => idOf(lead.stage) === stage._id).length} leads</span><label className="crm-color-control" title="Cambiar color"><input type="color" value={stage.color} onChange={event => void saveStage(stage, { color: event.target.value })} aria-label={`Color de ${stage.name}`} /><span style={{ background: stage.color }} /></label><button className="crm-row-action" onClick={() => void archiveStage(stage)} aria-label={`Archivar ${stage.name}`}><Archive size={16} /></button></article>)}</div><button className="crm-add-stage" onClick={() => setShowNewStage(true)}><Plus size={15} /> Añadir nueva etapa</button></section> : <>
           <div className="crm-board-toolbar"><div><span className="crm-live-dot" /> Pipeline general <span className="crm-board-count">{leadCount} leads</span></div><span className="crm-board-status">{loading ? 'Cargando...' : 'Actualizado'}</span></div>
-          {loading ? <div className="crm-empty-state">Cargando leads...</div> : stages.length === 0 ? <div className="crm-empty-state"><span className="crm-empty-emoji" aria-hidden="true">🗂️</span><h2>Aún no hay etapas</h2><p>Un administrador debe crear la primera etapa para comenzar a gestionar leads.</p>{canManageStages && <button className="crm-primary-button" onClick={() => setShowNewStage(true)}><Plus size={15} /> Crear primera etapa</button>}</div> : <div className="crm-board">{filteredStages.map(stage => <section className="crm-column" key={stage._id} onDragOver={event => event.preventDefault()} onDrop={() => void moveLead(stage._id)}><div className="crm-column-header"><div><span className="crm-stage-dot" style={{ background: stage.color }} /><strong>{stage.name}</strong><span className="crm-stage-count">{stage.leads.length}</span></div><button aria-label={`Opciones de ${stage.name}`}><MoreHorizontal size={17} /></button></div><div className="crm-column-body">{stage.leads.map(lead => <article className="crm-lead-card" key={lead._id} draggable onDragStart={() => setDraggedLead(lead._id)}><div className="crm-card-top"><span className="crm-lead-origin">{originLabel(lead.origin)}</span><button aria-label={`Opciones de ${lead.first_name}`}><MoreHorizontal size={16} /></button></div><h3>{lead.first_name} {lead.last_name}</h3><p className="crm-lead-detail">{lead.interestProgram ? nameOf(lead.interestProgram) : 'Programa sin asignar'}</p><div className="crm-card-tags">{(lead.tags || []).slice(0, 3).map(tag => <span key={tag}><Tag size={10} />{tag}</span>)}</div><div className="crm-card-bottom"><div className="crm-owner"><span className="crm-avatar">{initialsOf(lead)}</span><span>{nameOf(lead.responsible) || 'Sin responsable'}</span></div><span className="crm-age">{relativeDate(lead.created_at)}</span></div></article>)}{stage.leads.length === 0 && <div className="crm-empty-column">No hay leads aquí</div>}<button className="crm-add-card" onClick={() => { setForm(current => ({ ...current, stage: stage._id })); setShowNewLead(true) }}><Plus size={14} /> Añadir lead</button></div></section>)}{canManageStages && <button className="crm-new-column" onClick={() => setShowNewStage(true)}><Plus size={14} /> Añadir etapa</button>}</div>}
+          {loading ? <div className="crm-empty-state">Cargando leads...</div> : stages.length === 0 ? <div className="crm-empty-state"><span className="crm-empty-emoji" aria-hidden="true">🗂️</span><h2>Aún no hay etapas</h2><p>Un administrador debe crear la primera etapa para comenzar a gestionar leads.</p>{canManageStages && <button className="crm-primary-button" onClick={() => setShowNewStage(true)}><Plus size={15} /> Crear primera etapa</button>}</div> : <div className="crm-board">{filteredStages.map(stage => <section className="crm-column" key={stage._id} onDragOver={event => event.preventDefault()} onDrop={() => void moveLead(stage._id)}><div className="crm-column-header"><div><span className="crm-stage-dot" style={{ background: stage.color }} /><strong>{stage.name}</strong><span className="crm-stage-count">{stage.leads.length}</span></div><button aria-label={`Opciones de ${stage.name}`}><MoreHorizontal size={17} /></button></div><div className="crm-column-body">{stage.leads.map(lead => <article className="crm-lead-card" key={lead._id} draggable onDragStart={() => setDraggedLead(lead._id)}><div className="crm-card-top"><span className="crm-lead-origin">{originLabel(lead.origin)}</span><button aria-label={`Opciones de ${lead.first_name}`}><MoreHorizontal size={16} /></button></div><h3>{lead.first_name} {lead.last_name}</h3><p className="crm-lead-detail">{lead.interestProgram ? nameOf(lead.interestProgram) : 'Programa sin asignar'}</p><div className="crm-card-tags">{(lead.tags || []).slice(0, 3).map(tag => <span key={tag}><Tag size={10} />{tag}</span>)}</div><div className="crm-card-bottom"><div className="crm-owner"><span className="crm-avatar">{initialsOf(lead)}</span><span>{nameOf(lead.responsible) || nameOf(assignees.find(item => item._id === idOf(lead.responsible))) || 'Sin responsable'}</span></div><span className="crm-age">{relativeDate(lead.created_at)}</span></div></article>)}{stage.leads.length === 0 && <div className="crm-empty-column">No hay leads aquí</div>}<button className="crm-add-card" onClick={() => { setForm(current => ({ ...current, stage: stage._id })); setShowNewLead(true) }}><Plus size={14} /> Añadir lead</button></div></section>)}{canManageStages && <button className="crm-new-column" onClick={() => setShowNewStage(true)}><Plus size={14} /> Añadir etapa</button>}</div>}
         </>}
       </section>
 
-      {showNewLead && <ModalPortal><div className="crm-modal-backdrop" onMouseDown={() => setShowNewLead(false)}><form className="crm-modal crm-lead-modal" onSubmit={submitLead} onMouseDown={event => event.stopPropagation()}><div className="crm-modal-header"><div><span className="crm-modal-kicker">Nueva oportunidad</span><h2>Crear lead</h2><p>Registra un contacto y ubícalo en su etapa del embudo.</p></div><button type="button" onClick={() => setShowNewLead(false)} aria-label="Cerrar"><X size={17} /></button></div><div className="crm-form-grid"><label><span>Nombre <b>*</b></span><input required value={form.first_name} onChange={event => updateForm('first_name', event.target.value)} /></label><label><span>Apellido <b>*</b></span><input required value={form.last_name} onChange={event => updateForm('last_name', event.target.value)} /></label><label><span><Mail size={14} /> Correo <b>*</b></span><input required type="email" value={form.email} onChange={event => updateForm('email', event.target.value)} /></label><label><span>Teléfono <b>*</b></span><input required value={form.mobile_phone} onChange={event => updateForm('mobile_phone', event.target.value)} /></label><label><span>Tipo de documento <b>*</b></span><DesignSelect value={form.document_type} onChange={value => updateForm('document_type', value)} placeholder="Tipo de documento" options={documentTypes} /></label><label><span>Documento <b>*</b></span><input required value={form.document} onChange={event => updateForm('document', event.target.value)} /></label><label><span><Users size={14} /> Responsable <b>*</b></span><DesignSelect value={form.responsible} onChange={value => updateForm('responsible', value)} placeholder="Selecciona un responsable" options={assignees.map(item => ({ value: item._id, label: nameOf(item) || item.username || 'Sin nombre' }))} /></label><label><span>Origen <b>*</b></span><DesignSelect value={form.origin} onChange={value => updateForm('origin', value)} placeholder="Selecciona un origen" options={origins} /></label><label><span>Programa <b>*</b></span><DesignSelect value={form.interestProgram} onChange={value => updateForm('interestProgram', value)} placeholder="Selecciona un programa" options={programs.map(program => ({ value: program._id, label: program.name }))} /></label><label><span><Target size={14} /> Etapa <b>*</b></span><DesignSelect value={form.stage} onChange={value => updateForm('stage', value)} placeholder="Selecciona una etapa" options={stages.map(stage => ({ value: stage._id, label: stage.name }))} /></label><div className="crm-form-full"><span className="crm-field-label"><Tag size={14} /> Etiquetas</span><div className="crm-tag-input"><input value={tagInput} onChange={event => setTagInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addTag(tagInput) } }} placeholder="Escribe una etiqueta y presiona Enter" /><button type="button" onClick={() => addTag(tagInput)}><Plus size={15} /></button></div><div className="crm-selected-tags">{form.tags.map(tag => <button type="button" key={tag} onClick={() => setForm(current => ({ ...current, tags: current.tags.filter(item => item !== tag) }))}>{tag}<X size={11} /></button>)}</div></div></div><div className="crm-modal-footer"><button type="button" className="crm-secondary-button" onClick={() => setShowNewLead(false)}>Cancelar</button><button type="submit" className="crm-primary-button" disabled={saving}><UserPlus size={15} /> {saving ? 'Creando...' : 'Crear lead'}</button></div></form></div></ModalPortal>}
+      {showNewLead && (
+        <ModalPortal>
+          <div className="crm-modal-backdrop" onMouseDown={() => setShowNewLead(false)}>
+            <form className="crm-modal crm-lead-modal" onSubmit={submitLead} onMouseDown={event => event.stopPropagation()}>
+              <div className="crm-modal-header">
+                <div><span className="crm-modal-kicker">Nueva oportunidad</span><h2>Crear lead</h2><p>Registra un contacto y ubícalo en su etapa del embudo.</p></div>
+                <button type="button" onClick={() => setShowNewLead(false)} aria-label="Cerrar"><X size={17} /></button>
+              </div>
+              <div className="crm-form-grid">
+                <label className={fieldErrors.first_name ? 'crm-invalid-field' : ''}><span>Nombre <b>*</b></span><input value={form.first_name} aria-invalid={Boolean(fieldErrors.first_name)} onChange={event => updateForm('first_name', event.target.value)} /><FieldError message={fieldErrors.first_name} /></label>
+                <label className={fieldErrors.last_name ? 'crm-invalid-field' : ''}><span>Apellido <b>*</b></span><input value={form.last_name} aria-invalid={Boolean(fieldErrors.last_name)} onChange={event => updateForm('last_name', event.target.value)} /><FieldError message={fieldErrors.last_name} /></label>
+                <label className={fieldErrors.email ? 'crm-invalid-field' : ''}><span><Mail size={14} /> Correo <b>*</b></span><input type="email" value={form.email} aria-invalid={Boolean(fieldErrors.email)} onChange={event => updateForm('email', event.target.value)} /><FieldError message={fieldErrors.email} /></label>
+                <label className={fieldErrors.mobile_phone ? 'crm-invalid-field' : ''}><span>Teléfono <b>*</b></span><input inputMode="numeric" maxLength={10} value={form.mobile_phone} aria-invalid={Boolean(fieldErrors.mobile_phone)} onChange={event => updateForm('mobile_phone', event.target.value.replace(/[^0-9]/g, '').slice(0, 10))} /><FieldError message={fieldErrors.mobile_phone} /></label>
+                <label className={fieldErrors.document_type ? 'crm-invalid-field' : ''}><span>Tipo de documento <b>*</b></span><DesignSelect value={form.document_type} invalid={Boolean(fieldErrors.document_type)} onChange={value => updateForm('document_type', value)} placeholder="Tipo de documento" options={documentTypes} /><FieldError message={fieldErrors.document_type} /></label>
+                <label className={fieldErrors.document ? 'crm-invalid-field' : ''}><span>Documento <b>*</b></span><input inputMode="numeric" maxLength={20} value={form.document} aria-invalid={Boolean(fieldErrors.document)} onChange={event => updateForm('document', event.target.value.replace(/[^0-9]/g, '').slice(0, 20))} /><FieldError message={fieldErrors.document} /></label>
+                <label className={fieldErrors.responsible ? 'crm-invalid-field' : ''}><span><Users size={14} /> Responsable <b>*</b></span><DesignSelect value={form.responsible} invalid={Boolean(fieldErrors.responsible)} onChange={value => updateForm('responsible', value)} placeholder="Selecciona un responsable" options={assignees.map(item => ({ value: item._id, label: nameOf(item) || item.username || 'Sin nombre' }))} /><FieldError message={fieldErrors.responsible} /></label>
+                <label className={fieldErrors.origin ? 'crm-invalid-field' : ''}><span>Origen <b>*</b></span><DesignSelect value={form.origin} invalid={Boolean(fieldErrors.origin)} onChange={value => updateForm('origin', value)} placeholder="Selecciona un origen" options={origins} /><FieldError message={fieldErrors.origin} /></label>
+                <label className={fieldErrors.interestProgram ? 'crm-invalid-field' : ''}><span>Programa <b>*</b></span><DesignSelect value={form.interestProgram} invalid={Boolean(fieldErrors.interestProgram)} onChange={value => updateForm('interestProgram', value)} placeholder="Selecciona un programa" options={programs.map(program => ({ value: program._id, label: program.name }))} /><FieldError message={fieldErrors.interestProgram} /></label>
+                <label className={fieldErrors.stage ? 'crm-invalid-field' : ''}><span><Target size={14} /> Etapa <b>*</b></span><DesignSelect value={form.stage} invalid={Boolean(fieldErrors.stage)} onChange={value => updateForm('stage', value)} placeholder="Selecciona una etapa" options={stages.map(stage => ({ value: stage._id, label: stage.name }))} /><FieldError message={fieldErrors.stage} /></label>
+                <div className="crm-form-full"><span className="crm-field-label"><Tag size={14} /> Etiquetas</span><div className="crm-tag-input"><input value={tagInput} onChange={event => setTagInput(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); addTag(tagInput) } }} placeholder="Escribe una etiqueta y presiona Enter" /><button type="button" onClick={() => addTag(tagInput)}><Plus size={15} /></button></div><div className="crm-selected-tags">{form.tags.map(tag => <button type="button" key={tag} onClick={() => setForm(current => ({ ...current, tags: current.tags.filter(item => item !== tag) }))}>{tag}<X size={11} /></button>)}</div></div>
+              </div>
+              <div className="crm-modal-footer"><button type="button" className="crm-secondary-button" onClick={() => setShowNewLead(false)}>Cancelar</button><button type="submit" className="crm-primary-button" disabled={saving}><UserPlus size={15} /> {saving ? 'Creando...' : 'Crear lead'}</button></div>
+            </form>
+          </div>
+        </ModalPortal>
+      )}
 
       {showNewStage && <ModalPortal><div className="crm-modal-backdrop" onMouseDown={() => setShowNewStage(false)}><form className="crm-modal crm-small-modal" onSubmit={createStage} onMouseDown={event => event.stopPropagation()}><div className="crm-modal-header"><div><span className="crm-modal-kicker">Pipeline</span><h2>Nueva etapa</h2><p>Define un nuevo momento del proceso comercial.</p></div><button type="button" onClick={() => setShowNewStage(false)} aria-label="Cerrar"><X size={17} /></button></div><div className="crm-form-stack"><label>Nombre de la etapa<input autoFocus required value={newStageName} onChange={event => setNewStageName(event.target.value)} placeholder="Ej. En seguimiento" /></label><label>Color<input type="color" value={newStageColor} onChange={event => setNewStageColor(event.target.value)} /></label></div><div className="crm-modal-footer"><button type="button" className="crm-secondary-button" onClick={() => setShowNewStage(false)}>Cancelar</button><button type="submit" className="crm-primary-button" disabled={saving}><Plus size={15} /> Añadir etapa</button></div></form></div></ModalPortal>}
     </main>

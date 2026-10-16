@@ -334,6 +334,12 @@ body {
   font-size: 14px;
 }
 
+.crm-success-toast {
+  border-color: #c9a5df !important;
+  background: #fbf5ff !important;
+  color: #5b207c !important;
+}
+
 .crm-notice button,
 .crm-card-top button,
 .crm-column-header button,
@@ -992,6 +998,29 @@ body {
   font-weight: 700;
 }
 
+.crm-field-error {
+  display: block;
+  margin-top: -2px;
+  color: #a52d50;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.crm-invalid-field input,
+.crm-invalid-field .crm-select-trigger,
+.crm-form-grid input[aria-invalid="true"] {
+  border-color: #d77796 !important;
+  background: #fff8fa !important;
+}
+
+.crm-invalid-field input:focus,
+.crm-invalid-field .crm-select-trigger:focus,
+.crm-form-grid input[aria-invalid="true"]:focus {
+  border-color: #b83d64 !important;
+  box-shadow: 0 0 0 3px rgba(184, 61, 100, .13) !important;
+}
+
 .crm-form-grid label b {
   color: #9a46c4;
 }
@@ -1220,4 +1249,56 @@ body {
 .crm-modal-header > button:hover {
   background: transparent;
   color: #7224b5;
+}
+
+.crm-modal-header > button:focus,
+.crm-modal-header > button:focus-visible,
+.crm-modal-header > button:active {
+  outline: none;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.crm-form-alert-portal {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 10002;
+  width: min(620px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid #e6a9bc;
+  border-radius: 10px;
+  background: #fff5f7;
+  color: #8f294b;
+  box-shadow: 0 12px 30px rgba(95, 25, 52, .16);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.crm-form-alert-portal button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: #8f294b;
+}
+
+.crm-form-alert-portal button:focus,
+.crm-form-alert-portal button:focus-visible,
+.crm-form-alert-portal button:active {
+  outline: none;
+  border: 0;
+  box-shadow: none;
+}
+
+.crm-select-invalid {
+  border-color: #d77796 !important;
+  background: #fff8fa !important;
 }

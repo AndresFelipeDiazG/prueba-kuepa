@@ -11,6 +11,7 @@ import mongoose from 'mongoose'
 import { responseUtility } from "@core/utilities/responseUtility"
 import moment from "moment";
 import { validateLeadInput } from '@app/domains/lead/leadValidation'
+import { getDuplicateLeadErrors } from '@app/domains/lead/leadDuplicateRules'
 
 // @import_types
 
@@ -48,13 +49,34 @@ class LeadService {
       if (!program) return responseUtility.error('lead.program_not_found', null, { code: 404 })
       if (!stage) return responseUtility.error('lead.stage_not_found', null, { code: 404 })
 
+      const duplicate = await Lead.findOne({
+        $or: [
+          { mobile_phone: leadData.mobile_phone },
+          { document_type: leadData.document_type, document: leadData.document },
+        ],
+      })
+        .select('mobile_phone document_type document')
+        .lean()
+
+      if (duplicate) {
+        const errors = getDuplicateLeadErrors(duplicate, leadData)
+        return responseUtility.error('lead.duplicate', null, { code: 409, errors })
+      }
+
       const lead = await Lead.create({
         ...leadData,
         full_name: `${leadData.first_name} ${leadData.last_name}`.trim(),
+        status: 'active',
       })
 
       return responseUtility.success({ object: lead.toObject() })
-    } catch (error) {
+    } catch (error: any) {
+      if (error?.code === 11000) {
+        const errors: Record<string, string> = {}
+        if (error?.keyPattern?.mobile_phone) errors.mobile_phone = 'Ya existe un lead con este teléfono'
+        if (error?.keyPattern?.document_type || error?.keyPattern?.document) errors.document = 'Ya existe un lead con este documento'
+        return responseUtility.error('lead.duplicate', null, { code: 409, errors })
+      }
       console.log('Lead create error', error)
       return responseUtility.error('lead.create_error', null, { code: 500 })
     }
@@ -324,7 +346,9 @@ class LeadService {
     try{
       const where:any = {}
 
-      where.status = _params.status === 'inactive' ? 'inactive' : 'active'
+      if (_params.status) {
+        where.status = _params.status
+      }
 
       if (_params.stage && mongoose.isValidObjectId(_params.stage)) {
         where.stage = _params.stage

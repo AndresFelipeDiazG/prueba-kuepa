@@ -32,7 +32,7 @@ class AuthService {
           user = await User.findOne({_id: _token.user})
           .populate({
             path:'homes.roles',
-            select:'permission',
+             select:'name permissions',
             options: { lean:true },
             populate:{
               path: 'permissions',
@@ -47,7 +47,7 @@ class AuthService {
         user = await User.findOne({username:_params.username})
         .populate({
           path:'homes.roles',
-          select:'name permission',
+           select:'name permissions',
           options: { lean:true },
           populate:{
             path: 'permissions',
