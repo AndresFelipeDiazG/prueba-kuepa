@@ -5,12 +5,18 @@ import config from 'config'
 
 export const run = async(_params, console:IConsole) => {
   try{
+    const adminUsername = process.env.SEED_ADMIN_USERNAME
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD
+
+    if (!adminUsername || !adminPassword) {
+      throw new Error('SEED_ADMIN_USERNAME and SEED_ADMIN_PASSWORD are required')
+    }
     
     
     const users = [
       {
-        username: process.env.SEED_ADMIN_USERNAME || 'kuepa.admin',
-        password: process.env.SEED_ADMIN_PASSWORD || 'KuepaDev2026!', 
+        username: adminUsername,
+        password: adminPassword,
         number: '000000',
         profile:{
           first_name: 'Kuepa', 

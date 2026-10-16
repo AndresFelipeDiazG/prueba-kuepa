@@ -1,10 +1,10 @@
 import { App } from '@app/app'
-import config from 'config'
+import path from 'node:path'
 
-while (!process.cwd().endsWith(config.root)){
-  process.chdir('../')
+const backendRoot = path.resolve(__dirname, '../..')
+if (process.cwd() !== backendRoot) {
+  process.chdir(backendRoot)
 }
-
 
 const app = new App()
 

@@ -2,7 +2,18 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/kuepa_test?retryWrites=true&w=majority&appName=Test'
+const requiredEnvironmentVariable = (name: string): string => {
+  const value = process.env[name]
+
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`)
+  }
+
+  return value
+}
+
+const mongoUri = requiredEnvironmentVariable('MONGO_URI')
+const jwtSecret = requiredEnvironmentVariable('JWT_SECRET')
 
 export default {
   root: 'back',
@@ -17,7 +28,7 @@ export default {
       }
     }
   },
-  jwt: process.env.JWT_SECRET || 'local-development-secret-change-me',
+  jwt: jwtSecret,
   port: Number(process.env.PORT || 7001),
   public_url: process.env.PUBLIC_URL || 'http://localhost:7001'
 }

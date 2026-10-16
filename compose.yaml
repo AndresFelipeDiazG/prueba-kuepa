@@ -2,8 +2,8 @@ services:
   mongo:
     image: mongo:7.0
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    expose:
+      - "27017"
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -18,16 +18,18 @@ services:
       dockerfile: Dockerfile
     working_dir: /app
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "7001:7001"
     environment:
       NODE_ENV: development
       PORT: 7001
       PUBLIC_URL: http://localhost:7001
-      MONGO_URI: mongodb://mongo:27017/kuepa_test?retryWrites=true&w=majority
-      JWT_SECRET: ${JWT_SECRET:-local-development-secret-change-me}
-      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:-kuepa.admin}
-      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-KuepaDev2026!}
+      MONGO_URI: ${MONGO_URI:?MONGO_URI must be defined in .env}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be defined in .env}
+      SEED_ADMIN_USERNAME: ${SEED_ADMIN_USERNAME:?SEED_ADMIN_USERNAME must be defined in .env}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD must be defined in .env}
       CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./back:/app

@@ -9,6 +9,14 @@ Requisitos:
 - Docker Desktop iniciado.
 - Docker Compose incluido en Docker Desktop.
 
+Antes del primer inicio, crea tu archivo local de variables de entorno:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edita `.env` y reemplaza todos los valores `replace-*` por valores propios. El archivo `.env` está excluido de Git y nunca debe subirse al repositorio.
+
 Desde la raíz del proyecto:
 
 ```bash
@@ -19,14 +27,11 @@ Servicios:
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:7001
-- MongoDB: mongodb://localhost:27017
+- MongoDB: servicio interno `mongo:27017`
 
-El backend ejecuta el seeder inicial automáticamente antes de iniciar Express.
+MongoDB no se expone directamente al host; únicamente el backend accede a él mediante la red interna de Docker.
 
-Credenciales locales por defecto:
-
-- Usuario: `kuepa.admin`
-- Contraseña: `KuepaDev2026!`
+El backend ejecuta el seeder inicial automáticamente antes de iniciar Express usando las credenciales definidas en `.env`.
 
 Para detener los servicios:
 
