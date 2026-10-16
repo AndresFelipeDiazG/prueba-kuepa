@@ -43,7 +43,7 @@ export function AppLayout(props: AppLayoutProps) {
           <SidebarProvider defaultOpen={$app?.sidebar}>
             <AppSidebar  className={`bg-${$app?.accent}-800 text-white transition-all ease-in-out`} />
             <SidebarInset>
-              <header className="flex z-50 backdrop-blur-sm bg-white/75 h-12 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+              <header className={`flex z-50 backdrop-blur-sm bg-white/75 h-12 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 ${props.module === 'crm' ? 'crm-global-header' : ''}`}>
                 <div className="flex items-center gap-1 px-4">
                   <SidebarTrigger className="-ml-1" />
                   <Separator orientation="vertical" className="mr-2 h-4" />
@@ -99,7 +99,7 @@ export function AppLayout(props: AppLayoutProps) {
                   </Button>
                 </div>
               </header>
-              <div className="block p-1 md:p-0 absolute top-6 md:top-10 left-1/2 transform -translate-x-1/2 w-full md:min-h-screen-lg md:max-w-screen-xl m-auto">
+              <div className={`block p-1 md:p-0 absolute top-6 md:top-10 left-1/2 transform -translate-x-1/2 w-full md:min-h-screen-lg m-auto ${props.module === 'crm' ? 'crm-layout-content' : 'md:max-w-screen-xl'}`}>
                 <div className='relative'>
                   <div className="h-[88vh] lg:h-[94vh] overflow-y-auto overflow-x-hidden w-full rounded-md p-1 pb-0 md:p-4">
                     {children}
