@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "outDir": "dist",
+    "esModuleInterop": true,
+    "sourceMap": false,
+    "baseUrl": "./src",  
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@app/*"       : ["app/*"],
+      "@client/*"    : ["client/*"],
+      "@config/*"    : ["config/*"],
+      "@domains/*"    : ["app/domains/*"],
+      "@core/*"   : ["core/*"],
+      "@resources/*" : ["resources/*"],
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}

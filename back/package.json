@@ -1,0 +1,72 @@
+{
+  "name": "bk-test",
+  "version": "1.0.0",
+  "main": "./dist/app/server.ts",
+  "scripts": {
+    "build": "tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "dev": "nodemon -r tsconfig-paths/register --watch src src/app/server.ts",
+    "cli": "ts-node -r tsconfig-paths/register src/client/client.ts"
+  },
+  "keywords": [
+    "crm",
+    "erp",
+    "magic"
+  ],
+  "author": "Zadiaz [zd]",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/mongoose": "^5.11.97",
+    "@types/node": "^20.16.5",
+    "@types/ora": "^3.2.0",
+    "@types/pdf-parse": "^1.1.4",
+    "@typescript-eslint/eslint-plugin": "^5.62.0",
+    "eslint": "^8.47.0",
+    "eslint-config-standard-with-typescript": "^37.0.0",
+    "eslint-plugin-import": "^2.28.0",
+    "eslint-plugin-n": "^16.0.1",
+    "eslint-plugin-promise": "^6.1.1",
+    "morgan": "^1.10.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "tsx": "^4.17.0",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "bcryptjs": "^2.4.3",
+    "chalk": "^4.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.2",
+    "minimist": "^1.2.8",
+    "moment": "^2.29.4",
+    "mongoose": "^7.4.3",
+    "mongoose-delete": "^1.0.1",
+    "node-fetch": "^3.3.2",
+    "ora": "^3.4.0",
+    "pdf-parse": "^1.1.1",
+    "puppeteer": "^22.2.0",
+    "redis": "^4.7.0",
+    "redis-om": "^0.4.7",
+    "socket.io": "^4.7.5",
+    "tsc-alias": "^1.8.8",
+    "twilio": "^4.19.0",
+    "uuid": "^9.0.1"
+  },
+  "_moduleAliases": {
+    "@app": "src/app",
+    "@client": "src/client",
+    "@config": "src/config",
+    "@resources": "src/resources",
+    "@core": "src/core"
+  },
+  "moduleNameMapper": {
+    "^@app/(.+)$": "<rootDir>/src/app/$1",
+    "^@client/(.+)$": "<rootDir>/src/client/$1",
+    "^@config/(.+)$": "<rootDir>/src/config/$1",
+    "^@core/(.+)$": "<rootDir>/src/core/$1",
+    "^@domains/(.+)$": "<rootDir>/src/app/domains/$1",
+    "^@resources/(.+)$": "<rootDir>/src/resources/$1"
+  }
+}
