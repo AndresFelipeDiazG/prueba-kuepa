@@ -21,6 +21,53 @@ class LeadService {
   
   constructor () {}
 
+  private async findOrCreateContact (leadData) {
+    const matches: any[] = [{ number: leadData.mobile_phone }]
+    if (leadData.document_type && leadData.document) {
+      matches.push({ document_type: leadData.document_type, document: leadData.document })
+    }
+
+    const existingContact = await Third.findOne({ type: 'cli', $or: matches }).select('_id').lean()
+    if (existingContact) {
+      await Third.updateOne({ _id: existingContact._id }, { $set: {
+        first_name: leadData.first_name,
+        last_name: leadData.last_name,
+        full_name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim(),
+        email: leadData.email,
+        number: leadData.mobile_phone,
+        mobile_phone: leadData.mobile_phone,
+        document_type: leadData.document_type,
+        document: leadData.document,
+        responsible: leadData.responsible,
+        origin: leadData.origin,
+        tags: leadData.tags || [],
+        interestProgram: leadData.interestProgram,
+        lead_status: 'active',
+      } })
+      return existingContact._id
+    }
+
+    const contact = await Third.create({
+      type: 'cli',
+      status: 'active',
+      first_name: leadData.first_name,
+      last_name: leadData.last_name,
+      email: leadData.email,
+      number: leadData.mobile_phone,
+      mobile_phone: leadData.mobile_phone,
+      full_name: `${leadData.first_name || ''} ${leadData.last_name || ''}`.trim(),
+      document_type: leadData.document_type,
+      document: leadData.document,
+      responsible: leadData.responsible,
+      origin: leadData.origin,
+      tags: leadData.tags || [],
+      interestProgram: leadData.interestProgram,
+      lead_status: 'active',
+    })
+
+    return contact._id
+  }
+
   public async create (_params) {
     try {
       const validation = validateLeadInput(_params)
@@ -63,8 +110,10 @@ class LeadService {
         return responseUtility.error('lead.duplicate', null, { code: 409, errors })
       }
 
+      const contact = await this.findOrCreateContact(leadData)
       const lead = await Lead.create({
         ...leadData,
+        contact,
         full_name: `${leadData.first_name} ${leadData.last_name}`.trim(),
         status: 'active',
       })
@@ -366,7 +415,7 @@ class LeadService {
       .sort({created_at:-1})
       .populate({
         path: 'contact',
-        select: 'first_name last_name document number',
+        select: 'first_name last_name email document_type document number',
         options: { lean:true }
       })
       .populate({
@@ -388,7 +437,15 @@ class LeadService {
       .lean()
       
       leads = leads.map(_l=>{
-        _l.full_name = `${_l.contact?.first_name} ${_l.contact?.last_name}`.trim()
+        if (_l.contact) {
+          _l.first_name = _l.contact.first_name || _l.first_name
+          _l.last_name = _l.contact.last_name || _l.last_name
+          _l.email = _l.contact.email || _l.email
+          _l.mobile_phone = _l.contact.number || _l.mobile_phone
+          _l.document_type = _l.contact.document_type || _l.document_type
+          _l.document = _l.contact.document || _l.document
+        }
+        _l.full_name = `${_l.first_name || ''} ${_l.last_name || ''}`.trim()
         return _l
       })
       

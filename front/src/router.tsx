@@ -4,6 +4,7 @@ import { createBrowserRouter } from "react-router-dom";
 import NotFound from '@/pages/not-found/not-found';
 import { Skeleton } from "./components/ui/skeleton";
 import Leads from './pages/leads/leads';
+import Contacts from './pages/contacts/contacts';
 import { AppLayout } from './components/layouts/app-layout';
 import Home from './pages/home/home';
 
@@ -29,6 +30,15 @@ const router = createBrowserRouter([
       <AppLayout module="crm" window="lead">
         <Suspense fallback={<Loading mode="logo" />}>
           <Leads />
+        </Suspense>
+      </AppLayout>
+  },
+  {
+    path: '/contacts',
+    element:
+      <AppLayout module="crm" window="contact">
+        <Suspense fallback={<Loading mode="logo" />}>
+          <Contacts />
         </Suspense>
       </AppLayout>
   },

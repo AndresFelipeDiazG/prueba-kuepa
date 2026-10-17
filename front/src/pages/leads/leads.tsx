@@ -20,13 +20,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { DesignSelect } from '@/components/ui/design-select'
 
 type Stage = {
   _id: string
@@ -199,28 +193,6 @@ const validateLeadForm = (value: LeadForm): LeadFieldErrors => {
 
 function FieldError ({ message }: { message?: string }) {
   return message ? <small className="crm-field-error" role="alert">{message}</small> : null
-}
-
-type DesignSelectProps = {
-  value: string
-  placeholder: string
-  options: Array<{ value: string, label: string }>
-  onChange: (value: string) => void
-  disabled?: boolean
-  invalid?: boolean
-}
-
-function DesignSelect ({ value, placeholder, options, onChange, disabled = false, invalid = false }: DesignSelectProps) {
-  return (
-    <Select value={value || undefined} onValueChange={onChange} disabled={disabled}>
-      <SelectTrigger className={`crm-select-trigger ${invalid ? 'crm-select-invalid' : ''}`} aria-label={placeholder} aria-invalid={invalid}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent className="crm-select-content">
-        {options.map(option => <SelectItem className="crm-select-item" key={option.value} value={option.value}>{option.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  )
 }
 
 function ModalPortal ({ children }: { children: ReactNode }) {
@@ -517,7 +489,7 @@ export default function Leads () {
 
         {activeView === 'stages' && canManageStages ? <section className="crm-stage-settings"><div className="crm-settings-heading"><div><div className="crm-eyebrow"><Settings2 size={14} /> Configuración del pipeline</div><h2>Ordena y personaliza tus etapas</h2><p>Define el recorrido comercial y el color de cada etapa.</p></div><button className="crm-secondary-button" onClick={() => setActiveView('board')}><LayoutGrid size={15} /> Volver al kanban</button></div><div className="crm-stage-list">{stages.map((stage, index) => <article className="crm-stage-row" key={stage._id} draggable onDragStart={() => setDraggedStage(stage._id)} onDragOver={event => event.preventDefault()} onDrop={() => void reorderStages(stage._id)}><GripVertical className="crm-drag-handle" size={17} /><span className="crm-stage-order">{index + 1}</span><span className="crm-stage-dot large" style={{ background: stage.color }} /><input value={stage.name} onChange={event => setStages(current => current.map(item => item._id === stage._id ? { ...item, name: event.target.value } : item))} onBlur={() => void saveStage(stage, { name: stages.find(item => item._id === stage._id)?.name || stage.name })} aria-label={`Nombre de ${stage.name}`} /><span className="crm-stage-leads">{visibleLeads.filter(lead => idOf(lead.stage) === stage._id).length} leads</span><label className="crm-color-control" title="Cambiar color"><input type="color" value={stage.color} onChange={event => void saveStage(stage, { color: event.target.value })} aria-label={`Color de ${stage.name}`} /><span style={{ background: stage.color }} /></label><button className="crm-row-action" onClick={() => void archiveStage(stage)} aria-label={`Archivar ${stage.name}`}><Archive size={16} /></button></article>)}</div><button className="crm-add-stage" onClick={() => setShowNewStage(true)}><Plus size={15} /> Añadir nueva etapa</button></section> : <>
           <div className="crm-board-toolbar"><div><span className="crm-live-dot" /> Pipeline general <span className="crm-board-count">{leadCount} leads</span></div><span className="crm-board-status">{loading ? 'Cargando...' : 'Actualizado'}</span></div>
-          {loading ? <div className="crm-empty-state">Cargando leads...</div> : stages.length === 0 ? <div className="crm-empty-state"><span className="crm-empty-emoji" aria-hidden="true">🗂️</span><h2>Aún no hay etapas</h2><p>Un administrador debe crear la primera etapa para comenzar a gestionar leads.</p>{canManageStages && <button className="crm-primary-button" onClick={() => setShowNewStage(true)}><Plus size={15} /> Crear primera etapa</button>}</div> : <div className="crm-board">{filteredStages.map(stage => <section className="crm-column" key={stage._id} onDragOver={event => event.preventDefault()} onDrop={() => void moveLead(stage._id)}><div className="crm-column-header"><div><span className="crm-stage-dot" style={{ background: stage.color }} /><strong>{stage.name}</strong><span className="crm-stage-count">{stage.leads.length}</span></div><button aria-label={`Opciones de ${stage.name}`}><MoreHorizontal size={17} /></button></div><div className="crm-column-body">{stage.leads.map(lead => <article className="crm-lead-card" key={lead._id} draggable onDragStart={() => setDraggedLead(lead._id)}><div className="crm-card-top"><span className="crm-lead-origin">{originLabel(lead.origin)}</span><button aria-label={`Opciones de ${lead.first_name}`}><MoreHorizontal size={16} /></button></div><h3>{lead.first_name} {lead.last_name}</h3><p className="crm-lead-detail">{lead.interestProgram ? nameOf(lead.interestProgram) : 'Programa sin asignar'}</p><div className="crm-card-tags">{(lead.tags || []).slice(0, 3).map(tag => <span key={tag}><Tag size={10} />{tag}</span>)}</div><div className="crm-card-bottom"><div className="crm-owner"><span className="crm-avatar">{initialsOf(lead)}</span><span>{nameOf(lead.responsible) || nameOf(assignees.find(item => item._id === idOf(lead.responsible))) || 'Sin responsable'}</span></div><span className="crm-age">{relativeDate(lead.created_at)}</span></div></article>)}{stage.leads.length === 0 && <div className="crm-empty-column">No hay leads aquí</div>}<button className="crm-add-card" onClick={() => { setForm(current => ({ ...current, stage: stage._id })); setShowNewLead(true) }}><Plus size={14} /> Añadir lead</button></div></section>)}{canManageStages && <button className="crm-new-column" onClick={() => setShowNewStage(true)}><Plus size={14} /> Añadir etapa</button>}</div>}
+          {loading ? <div className="crm-empty-state">Cargando leads...</div> : stages.length === 0 ? <div className="crm-empty-state"><span className="crm-empty-emoji" aria-hidden="true">🗂️</span><h2>Aún no hay etapas</h2><p>Un administrador debe crear la primera etapa para comenzar a gestionar leads.</p>{canManageStages && <button className="crm-primary-button" onClick={() => setShowNewStage(true)}><Plus size={15} /> Crear primera etapa</button>}</div> : <div className="crm-board">{filteredStages.map(stage => <section className="crm-column" key={stage._id} onDragOver={event => event.preventDefault()} onDrop={() => void moveLead(stage._id)}><div className="crm-column-header"><div><span className="crm-stage-dot" style={{ background: stage.color }} /><strong>{stage.name}</strong><span className="crm-stage-count">{stage.leads.length}</span></div><button aria-label={`Opciones de ${stage.name}`}><MoreHorizontal size={17} /></button></div><div className="crm-column-body">{stage.leads.map(lead => <article className="crm-lead-card" key={lead._id} draggable onDragStart={() => setDraggedLead(lead._id)}><div className="crm-card-top"><span className="crm-lead-origin">{originLabel(lead.origin)}</span><button aria-label={`Opciones de ${lead.first_name}`}><MoreHorizontal size={16} /></button></div><h3>{lead.first_name} {lead.last_name}</h3><p className="crm-lead-detail">{lead.interestProgram ? nameOf(lead.interestProgram) : 'Programa sin asignar'}</p><div className="crm-card-tags">{(lead.tags || []).slice(0, 3).map(tag => <span key={tag}><Tag size={10} />{tag}</span>)}</div><div className="crm-card-bottom"><div className="crm-owner"><span className="crm-avatar">{initialsOf(lead)}</span><span>{nameOf(lead.responsible) || nameOf(assignees.find(item => item._id === idOf(lead.responsible))) || 'Sin responsable'}</span></div><span className="crm-age">{relativeDate(lead.created_at)}</span></div></article>)}{stage.leads.length === 0 && <div className="crm-empty-column"><span className="crm-empty-column-emoji" aria-hidden="true">🪄</span><strong>Sin leads todavía</strong><small>Arrastra un lead aquí</small></div>}<button className="crm-add-card" onClick={() => { setForm(current => ({ ...current, stage: stage._id })); setShowNewLead(true) }}><Plus size={14} /> Añadir lead</button></div></section>)}{canManageStages && <button className="crm-new-column" onClick={() => setShowNewStage(true)}><Plus size={14} /> Añadir etapa</button>}</div>}
         </>}
       </section>
 

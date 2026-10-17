@@ -37,6 +37,18 @@ class ThirdController {
     const response = await this.service.upsert(_params)
     return responseUtility.build(res, response)
   }
+
+  public addNote = async(req: Request, res: Response) => {
+    const _params = req._data()
+    const response = await this.service.addNote(_params)
+    return responseUtility.build(res, response)
+  }
+
+  public delete = async(req: Request, res: Response) => {
+    const _params = req._data()
+    const response = await this.service.delete(_params)
+    return responseUtility.build(res, response)
+  }
   
   public get = async(req: Request, res: Response) => {
     const _params = req._data()
