@@ -11,6 +11,10 @@ export interface IThird {
   email?: string;
   document_type?: 'cc' | 'ti' | 'pp' | 'nt';
   document?: string;
+  birthdate?: string;
+  city?: string;
+  department?: string;
+  educationLevel?: string;
   responsible?: mongoose.Types.ObjectId;
   origin?: 'website' | 'facebook' | 'instagram' | 'whatsapp' | 'referral' | 'other';
   tags?: string[];
@@ -55,6 +59,24 @@ const ThirdSchema = new Schema({
   },
   document:{
     type: Schema.Types.String,
+  },
+  birthdate:{
+    type: Schema.Types.String,
+    trim: true,
+    match: /^\d{4}-\d{2}-\d{2}$/,
+  },
+  city:{
+    type: Schema.Types.String,
+    trim: true,
+    maxlength: 80,
+  },
+  department:{
+    type: Schema.Types.String,
+    trim: true,
+  },
+  educationLevel:{
+    type: Schema.Types.String,
+    trim: true,
   },
   tags: [{ type: Schema.Types.String, trim: true }],
   responsible: { type: Schema.Types.ObjectId, ref: 'User' },

@@ -3,7 +3,6 @@ import { lazy, Suspense } from 'react';
 import { createBrowserRouter } from "react-router-dom";
 import NotFound from '@/pages/not-found/not-found';
 import { Skeleton } from "./components/ui/skeleton";
-import Leads from './pages/leads/leads';
 import Contacts from './pages/contacts/contacts';
 import ContactDetail from './pages/contacts/contact-detail';
 import { AppLayout } from './components/layouts/app-layout';
@@ -24,15 +23,6 @@ const router = createBrowserRouter([
     <Suspense fallback={<Loading mode="logo" />}>
       <Login />
     </Suspense>
-  },
-  {
-    path: '/leads',
-    element: 
-      <AppLayout module="crm" window="lead">
-        <Suspense fallback={<Loading mode="logo" />}>
-          <Leads />
-        </Suspense>
-      </AppLayout>
   },
   {
     path: '/contacts',

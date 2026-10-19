@@ -1,5 +1,20 @@
 const NAME_PATTERN = /^[\p{L}\s'-]+$/u
 const DOCUMENT_TYPES = ['cc', 'ti', 'pp', 'nt'] as const
+const BIRTHDATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
+/** Departamentos de Colombia (el valor se guarda igual a la etiqueta). */
+export const DEPARTMENTS: readonly string[] = [
+  'Amazonas', 'Antioquia', 'Arauca', 'Atlántico', 'Bolívar', 'Bogotá D.C.', 'Boyacá', 'Caldas',
+  'Caquetá', 'Casanare', 'Cauca', 'Cesar', 'Chocó', 'Córdoba', 'Cundinamarca', 'Guainía', 'Guaviare',
+  'Huila', 'La Guajira', 'Magdalena', 'Meta', 'Nariño', 'Norte de Santander', 'Putumayo', 'Quindío',
+  'Risaralda', 'San Andrés y Providencia', 'Santander', 'Sucre', 'Tolima', 'Valle del Cauca',
+  'Vaupés', 'Vichada',
+]
+
+export const EDUCATION_LEVELS: readonly string[] = [
+  'none', 'primary', 'secondary', 'technician', 'technologist', 'undergraduate',
+  'specialization', 'master', 'doctorate',
+]
 
 export type ContactInput = {
   first_name?: unknown
@@ -8,6 +23,10 @@ export type ContactInput = {
   number?: unknown
   document_type?: unknown
   document?: unknown
+  birthdate?: unknown
+  city?: unknown
+  department?: unknown
+  educationLevel?: unknown
   tags?: unknown
   responsible?: unknown
   origin?: unknown
@@ -24,6 +43,10 @@ export type ContactValue = {
   number: string
   document_type: typeof DOCUMENT_TYPES[number]
   document: string
+  birthdate?: string
+  city?: string
+  department?: string
+  educationLevel?: string
   tags: string[]
   responsible?: string
   origin?: string
@@ -52,6 +75,10 @@ export const validateContactInput = (input: ContactInput): ContactValidationResu
   const number = text(input.number)
   const documentType = text(input.document_type)
   const document = text(input.document)
+  const birthdate = text(input.birthdate)
+  const city = text(input.city)
+  const department = text(input.department)
+  const educationLevel = text(input.educationLevel)
   const tags = normalizeTags(input.tags)
   const errors: Record<string, string> = {}
 
@@ -72,6 +99,16 @@ export const validateContactInput = (input: ContactInput): ContactValidationResu
   else if (!/^\d+$/.test(document)) errors.document = 'El documento solo puede contener números'
   else if (document.length < 4 || document.length > 20) errors.document = 'El documento debe tener entre 4 y 20 dígitos'
 
+  if (birthdate) {
+    const parsed = BIRTHDATE_PATTERN.test(birthdate) ? new Date(`${birthdate}T00:00:00`) : null
+    if (!parsed || Number.isNaN(parsed.getTime())) errors.birthdate = 'La fecha de nacimiento no es válida'
+    else if (parsed.getTime() > Date.now()) errors.birthdate = 'La fecha de nacimiento no puede ser futura'
+    else if (parsed.getFullYear() < 1900) errors.birthdate = 'La fecha de nacimiento no es válida'
+  }
+  if (city.length > 80) errors.city = 'La ciudad no puede superar 80 caracteres'
+  if (department && !DEPARTMENTS.includes(department)) errors.department = 'Selecciona un departamento válido'
+  if (educationLevel && !EDUCATION_LEVELS.includes(educationLevel)) errors.educationLevel = 'Selecciona un nivel de escolaridad válido'
+
   if (Object.keys(errors).length > 0) return { errors }
 
   return {
@@ -84,6 +121,10 @@ export const validateContactInput = (input: ContactInput): ContactValidationResu
       document_type: documentType as typeof DOCUMENT_TYPES[number],
       document,
       tags,
+      ...(birthdate ? { birthdate } : {}),
+      ...(city ? { city } : {}),
+      ...(department ? { department } : {}),
+      ...(educationLevel ? { educationLevel } : {}),
       ...(typeof input.responsible === 'string' && input.responsible.trim() ? { responsible: input.responsible.trim() } : {}),
       ...(typeof input.origin === 'string' && input.origin.trim() ? { origin: input.origin.trim() } : {}),
       ...(typeof input.interestProgram === 'string' && input.interestProgram.trim() ? { interestProgram: input.interestProgram.trim() } : {}),

@@ -4,7 +4,8 @@ import { ArrowLeft, X } from 'lucide-react'
 import { app } from '@/atoms/kuepa'
 import { useToast } from '@/components/hooks/use-toast'
 import { DesignSelect } from '@/components/ui/design-select'
-import { HintTooltip } from '@/components/ui/hint-tooltip'
+import { HelpTooltip } from '@/components/ui/help-tooltip'
+import { Modal } from '@/components/ui/modal'
 import { leadService } from '@/services/leadService'
 import { thirdService } from '@/services/thirdService'
 import {
@@ -14,8 +15,11 @@ import {
   ContactForm,
   FieldError,
   Program,
+  avatarTone,
   contactName,
+  departmentOptions,
   documentTypes,
+  educationLevels,
   emptyForm,
   formFromContact,
   fullDate,
@@ -25,6 +29,7 @@ import {
   origins,
   relativeDate,
   responseMessage,
+  todayIso,
   validateContactForm,
 } from './contact-shared'
 
@@ -43,6 +48,7 @@ export default function ContactDetail () {
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
   const [showNote, setShowNote] = useState(false)
+  const [showDelete, setShowDelete] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -110,6 +116,10 @@ export default function ContactDetail () {
       number: form.number,
       document_type: form.document_type,
       document: form.document,
+      birthdate: form.birthdate,
+      city: form.city.trim(),
+      department: form.department,
+      educationLevel: form.educationLevel,
       tags: normalizeTags(form.tags),
       type: 'cli',
       status: contact.status || 'active',
@@ -140,13 +150,12 @@ export default function ContactDetail () {
 
   const deleteContact = async () => {
     if (!contact) return
-    if (!window.confirm(`¿Eliminar el contacto ${contactName(contact)}? Esta acción no se puede deshacer.`)) return
     setDeleting(true)
     const response = await thirdService.delete(contact._id)
     if (response?.code === 200) {
       toast({ title: 'Contacto eliminado', description: 'El contacto se eliminó correctamente.', className: 'crm-success-toast' })
       void navigate('/contacts')
-    } else { setNotice(responseMessage(response)); setDeleting(false) }
+    } else { setNotice(responseMessage(response)); setDeleting(false); setShowDelete(false) }
   }
 
   if (loading) return <main className="crm-page"><section className="crm-content"><div className="crm-empty-state">⏳ Cargando contacto...</div></section></main>
@@ -160,6 +169,9 @@ export default function ContactDetail () {
     </div>
   </section></main>
 
+  const noteCount = contact.notes?.length || 0
+  const notesSummary = noteCount ? `sus ${noteCount} ${noteCount === 1 ? 'nota' : 'notas'} y ` : ''
+
   return <main className="crm-page"><section className="crm-content">
     <button type="button" className="crm-back-button" onClick={() => void navigate('/contacts')}><ArrowLeft size={15} aria-hidden="true" /> Volver a contactos</button>
     <div className="crm-heading"><div><h1>👤 {contactName(form)}</h1><p>Edita la información directamente y guarda los cambios.</p></div></div>
@@ -169,7 +181,7 @@ export default function ContactDetail () {
       <div className="crm-record-main">
         <form className="crm-record-form" onSubmit={saveContact} noValidate>
           <div className="crm-detail-hero">
-            <div className="crm-detail-avatar">{initialsOf(form)}</div>
+            <div className="crm-detail-avatar" style={{ background: avatarTone(contact._id).strong }}>{initialsOf(form)}</div>
             <div>
               <strong>{contactName(form)}</strong>
               <span>{form.tags.length} {form.tags.length === 1 ? 'etiqueta' : 'etiquetas'} · creado {relativeDate(contact.created_at)}</span>
@@ -183,6 +195,10 @@ export default function ContactDetail () {
             <label className={fieldErrors.number ? 'crm-invalid-field' : ''}><span>📞 Teléfono <b>*</b></span><input inputMode="numeric" maxLength={10} value={form.number} onChange={event => updateField('number', event.target.value.replace(/\D/g, '').slice(0, 10))} /><FieldError message={fieldErrors.number} /></label>
             <label className={fieldErrors.document_type ? 'crm-invalid-field' : ''}><span>Tipo de documento <b>*</b></span><DesignSelect value={form.document_type} invalid={Boolean(fieldErrors.document_type)} onChange={value => updateField('document_type', value)} placeholder="Tipo de documento" options={documentTypes} /><FieldError message={fieldErrors.document_type} /></label>
             <label className={fieldErrors.document ? 'crm-invalid-field' : ''}><span>🪪 Documento <b>*</b></span><input inputMode="numeric" maxLength={20} value={form.document} onChange={event => updateField('document', event.target.value.replace(/\D/g, '').slice(0, 20))} /><FieldError message={fieldErrors.document} /></label>
+            <label className={fieldErrors.birthdate ? 'crm-invalid-field' : ''}><span>🎂 Fecha de nacimiento</span><input type="date" max={todayIso()} value={form.birthdate} onChange={event => updateField('birthdate', event.target.value)} /><FieldError message={fieldErrors.birthdate} /></label>
+            <label className={fieldErrors.educationLevel ? 'crm-invalid-field' : ''}><span>📚 Nivel de escolaridad</span><DesignSelect value={form.educationLevel} onChange={value => updateField('educationLevel', value)} placeholder="Sin nivel" options={educationLevels} /><FieldError message={fieldErrors.educationLevel} /></label>
+            <label className={fieldErrors.city ? 'crm-invalid-field' : ''}><span>🏙️ Ciudad</span><input maxLength={80} value={form.city} onChange={event => updateField('city', event.target.value)} /><FieldError message={fieldErrors.city} /></label>
+            <label className={fieldErrors.department ? 'crm-invalid-field' : ''}><span>🗺️ Departamento</span><DesignSelect value={form.department} onChange={value => updateField('department', value)} placeholder="Sin departamento" options={departmentOptions} /><FieldError message={fieldErrors.department} /></label>
             <label><span>🎓 Programa</span><DesignSelect value={form.interestProgram} onChange={value => updateField('interestProgram', value)} placeholder="Sin programa" options={programs.map(program => ({ value: program._id, label: program.name }))} /></label>
             <label><span>👤 Responsable</span><DesignSelect value={form.responsible} onChange={value => updateField('responsible', value)} placeholder="Sin responsable" options={assignees.map(person => ({ value: person._id, label: `${person.profile?.first_name || ''} ${person.profile?.last_name || ''}`.trim() || person.username || 'Sin nombre' }))} /></label>
             <label><span>🌐 Origen</span><DesignSelect value={form.origin} onChange={value => updateField('origin', value)} placeholder="Sin origen" options={origins} /></label>
@@ -227,12 +243,12 @@ export default function ContactDetail () {
       <aside className="crm-record-side">
         <div className="crm-side-card">
           <h3>⚡ Acciones</h3>
-          <HintTooltip label="Agregar nota: registra una nota interna en el contacto.">
+          <HelpTooltip side="left" title="Agregar nota" description="Registra una nota interna en este contacto para llevar el seguimiento de la conversación.">
             <button type="button" className="crm-side-action" onClick={() => setShowNote(true)}>📝 Agregar nota</button>
-          </HintTooltip>
-          <HintTooltip label="Eliminar contacto: borra el contacto y sus oportunidades. No se puede deshacer.">
-            <button type="button" className="crm-side-action crm-side-danger" onClick={() => void deleteContact()} disabled={deleting}>🗑️ Eliminar contacto</button>
-          </HintTooltip>
+          </HelpTooltip>
+          <HelpTooltip side="left" title="Eliminar contacto" description="Borra el contacto, sus notas y las oportunidades asociadas. Esta acción no se puede deshacer.">
+            <button type="button" className="crm-side-action crm-side-danger" onClick={() => setShowDelete(true)} disabled={deleting}>🗑️ Eliminar contacto</button>
+          </HelpTooltip>
         </div>
 
         <div className="crm-side-card">
@@ -244,5 +260,23 @@ export default function ContactDetail () {
         </div>
       </aside>
     </div>
+
+    {showDelete && <Modal
+      size="sm"
+      role="alertdialog"
+      className="crm-confirm-modal"
+      kicker="⚠️ Advertencia"
+      title="Eliminar contacto"
+      busy={deleting}
+      onClose={() => setShowDelete(false)}
+      footer={<>
+        <button type="button" className="crm-secondary-button" onClick={() => setShowDelete(false)} disabled={deleting}>Cancelar</button>
+        <button type="button" className="crm-danger-button" autoFocus disabled={deleting} onClick={() => void deleteContact()}>{deleting ? 'Eliminando...' : '🗑️ Eliminar contacto'}</button>
+      </>}
+    >
+      <p className="crm-warning-text">
+        Se eliminará <strong>{contactName(contact)}</strong> de forma permanente junto con {notesSummary}las oportunidades asociadas. Esta acción no se puede deshacer.
+      </p>
+    </Modal>}
   </section></main>
 }

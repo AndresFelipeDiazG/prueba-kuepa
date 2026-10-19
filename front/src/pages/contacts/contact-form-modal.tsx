@@ -11,12 +11,15 @@ import {
   FieldError,
   ModalPortal,
   Program,
+  departmentOptions,
   documentTypes,
+  educationLevels,
   emptyForm,
   formFromContact,
   normalizeTags,
   origins,
   responseMessage,
+  todayIso,
   validateContactForm,
 } from './contact-shared'
 
@@ -56,6 +59,10 @@ export default function ContactFormModal ({ contact, programs, assignees, onClos
       number: form.number,
       document_type: form.document_type,
       document: form.document,
+      birthdate: form.birthdate,
+      city: form.city.trim(),
+      department: form.department,
+      educationLevel: form.educationLevel,
       tags: normalizeTags(form.tags),
       type: 'cli',
       status: contact?.status || 'active',
@@ -77,9 +84,7 @@ export default function ContactFormModal ({ contact, programs, assignees, onClos
       <form className="crm-modal crm-contact-modal" onSubmit={submitContact} onMouseDown={event => event.stopPropagation()} noValidate>
         <div className="crm-modal-header">
           <div>
-            <span className="crm-modal-kicker">👥 Directorio comercial</span>
-            <h2>{contact ? 'Editar contacto' : 'Nuevo contacto'}</h2>
-            <p>Información personal y comercial del contacto.</p>
+            <h2>👥 {contact ? 'Editar contacto' : 'Nuevo contacto'}</h2>
           </div>
           <button type="button" onClick={closeModal} aria-label="Cerrar"><X size={17} /></button>
         </div>
@@ -93,6 +98,10 @@ export default function ContactFormModal ({ contact, programs, assignees, onClos
           <label><span>🎓 Programa</span><DesignSelect value={form.interestProgram} onChange={value => updateForm('interestProgram', value)} placeholder="Sin programa" options={programs.map(program => ({ value: program._id, label: program.name }))} /></label>
           <label><span>👤 Responsable</span><DesignSelect value={form.responsible} onChange={value => updateForm('responsible', value)} placeholder="Sin responsable" options={assignees.map(person => ({ value: person._id, label: `${person.profile?.first_name || ''} ${person.profile?.last_name || ''}`.trim() || person.username || 'Sin nombre' }))} /></label>
           <label><span>🌐 Origen</span><DesignSelect value={form.origin} onChange={value => updateForm('origin', value)} placeholder="Sin origen" options={origins} /></label>
+          <label className={fieldErrors.birthdate ? 'crm-invalid-field' : ''}><span>🎂 Fecha de nacimiento</span><input type="date" max={todayIso()} value={form.birthdate} onChange={event => updateForm('birthdate', event.target.value)} /><FieldError message={fieldErrors.birthdate} /></label>
+          <label className={fieldErrors.educationLevel ? 'crm-invalid-field' : ''}><span>📚 Nivel de escolaridad</span><DesignSelect value={form.educationLevel} onChange={value => updateForm('educationLevel', value)} placeholder="Sin nivel" options={educationLevels} /><FieldError message={fieldErrors.educationLevel} /></label>
+          <label className={fieldErrors.city ? 'crm-invalid-field' : ''}><span>🏙️ Ciudad</span><input maxLength={80} value={form.city} onChange={event => updateForm('city', event.target.value)} /><FieldError message={fieldErrors.city} /></label>
+          <label className={fieldErrors.department ? 'crm-invalid-field' : ''}><span>🗺️ Departamento</span><DesignSelect value={form.department} onChange={value => updateForm('department', value)} placeholder="Sin departamento" options={departmentOptions} /><FieldError message={fieldErrors.department} /></label>
           <div className="crm-form-full">
             <span className="crm-field-label">🏷️ Etiquetas</span>
             <div className="crm-tag-input">

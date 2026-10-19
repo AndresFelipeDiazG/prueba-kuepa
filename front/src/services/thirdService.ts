@@ -10,6 +10,10 @@ export type ContactPayload = {
   number: string
   document_type: string
   document: string
+  birthdate?: string
+  city?: string
+  department?: string
+  educationLevel?: string
   tags?: string[]
   incremental?: number
   mobile_phone?: string

@@ -64,6 +64,8 @@ class ThirdService {
           { document: expression },
           { number: expression },
           { email: expression },
+          { city: expression },
+          { department: expression },
           { tags: expression },
           { origin: expression },
         ]
@@ -78,7 +80,7 @@ class ThirdService {
       for (const field of ['first_name', 'last_name', 'email', 'number', 'document']) {
         if (_params[field]) where[field] = textFilter(_params[field])
       }
-      for (const field of ['document_type', 'origin', 'lead_status']) {
+      for (const field of ['document_type', 'origin', 'lead_status', 'department', 'educationLevel']) {
         if (_params[field]) where[field] = String(_params[field]).trim()
       }
       for (const field of ['responsible', 'interestProgram']) {
@@ -217,9 +219,14 @@ class ThirdService {
         }
 
         if (_params._id) {
+          // Campos opcionales que sí se pueden vaciar desde el formulario.
+          const clearable = ['birthdate', 'city', 'department', 'educationLevel']
+          const unset = clearable.filter(field => field in _params && !contactData[field])
+          const update:any = { $set: contactData }
+          if (unset.length) update.$unset = unset.reduce((acc:any, field) => ({ ...acc, [field]: '' }), {})
           const contact = await Third.findOneAndUpdate(
             { _id: _params._id, type: 'cli' },
-            { $set: contactData },
+            update,
             { new: true, lean: true, runValidators: true },
           )
           if (!contact) return responseUtility.error('third.not_found', null, { code: 404 })
